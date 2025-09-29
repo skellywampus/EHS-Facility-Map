@@ -1,3 +1,5 @@
+<img src="https://github.com/skellywampus/EHS-Facility-Map/blob/main/Screenshot.png" alt="">
+
 # Facility Map Viewer & Editor
 
 This is a self-contained, browser-based facility map tool designed for environmental, health, and safety (EHS) applications. It allows organizations to visually manage and annotate site maps with key safety infrastructure such as:
