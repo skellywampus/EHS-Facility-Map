@@ -777,6 +777,7 @@
         } else if (cfg.shape === 'pill') {
           let txt = (p.label || '').trim();
           if (p.type === 'spill') txt = txt || '00';
+		  else if (p.type === 'aed') txt = 'AED';
           else if (p.type === 'ep') {
             if (!txt) txt = 'EP';
             else if (!/^EP/i.test(txt)) txt = 'EP' + txt;
