@@ -409,6 +409,12 @@
           labeled: true,
           shape: 'pill'
         },
+		aed: {
+          name: 'AED',
+          color: '#e53935',
+          labeled: false,
+          shape: 'pill'
+        },
         shower: {
           name: 'Emergency Shower',
           color: '#08c',
@@ -995,7 +1001,7 @@
       function iconHTML(type) {
         const c = TYPES[type].color;
         if (TYPES[type].shape === 'pill') {
-          const text = type === 'spill' ? 'SK' : type === 'ep' ? 'EP' : type === 'safer' ? 'SAFE' : type === 'evac' ? 'EVAC' : 'LBL';
+          const text = type === 'spill' ? 'SK' : type === 'aed' ? 'AED' : type === 'ep' ? 'EP' : type === 'safer' ? 'SAFE' : type === 'evac' ? 'EVAC' : 'LBL';
           return `
 																			<span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:${c};color:#fff;font-weight:700;font-size:12px;text-align:center;">${text}</span>`;
         }
