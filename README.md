@@ -5,7 +5,8 @@
 This is a self-contained, browser-based facility map tool designed for environmental, health, and safety (EHS) applications. It allows organizations to visually manage and annotate site maps with key safety infrastructure such as:
 
 - Fire Extinguishers  
-- Spill Kits  
+- Spill Kits
+- AEDs
 - Emergency Showers  
 - Eyewashes  
 - Emission Points  
