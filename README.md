@@ -2,91 +2,96 @@
 
 # Facility Map Viewer & Editor
 
-This is a self-contained, browser-based facility map tool designed for environmental, health, and safety (EHS) applications. It allows organizations to visually manage and annotate site maps with key safety infrastructure such as:
+A self-contained, browser-based facility map system for Environmental, Health, and Safety (EHS) management.  
+It provides a visual, interactive method to locate, label, and document key safety assets within a facility.
 
-- Fire Extinguishers  
-- Spill Kits
-- AEDs
-- Emergency Showers  
-- Eyewashes  
-- Emission Points  
-- Stormwater Outfalls  
-- Bulk Chemical Storage  
-- Waste Accumulation Areas  
-- Safer Areas  
-- Evacuation Points  
+---
 
-## Features
+## Key Capabilities
 
-- ✅ Toggleable layers for each item type  
-- ✅ Admin login for placing, labeling, and saving pins  
-- ✅ Pins are saved directly in the HTML file—fully self-contained  
-- ✅ Optional printing support with only visible legend items included  
-- ✅ Exportable image with visible markers  
-- ✅ No server required, only a shared network drive.
+### General
+- Fully self-contained — all data (pins, marker types, configuration) stored inside the HTML file.
+- No server, database, or external dependencies required.
+- Works directly from a shared network drive.
+- Cross-browser compatible; tested in Chrome, Edge, and Orion.
+
+### Map & Visualization
+- Toggle visibility of individual item types via the dynamic legend.
+- Zoom, rotate, and pan with mouse or controls.
+- Tooltip display of item type and label on hover.
+- Real-time pin placement, movement, and deletion (admin only).
+
+### Admin Features
+- Password-protected admin mode.
+- Add, edit, or delete marker **types** (shape, color, labeled flag, abbreviation).
+- Add, move, or delete **pins** for all marker types.
+- Import pins from an existing HTML file.
+- Export/save new layouts as a single updated HTML file.
+- Change admin password within the interface (persists after saving layout).
+- Manage all marker types and pins via popup modals.
+
+### Persistence
+- All edits (pins, marker types, password changes) are embedded directly into the exported HTML.
+- The saved file becomes the new working copy—no additional configuration files required.
+
+### Printing
+- **Print Map:** Standard print view with visible markers.  
+- **Print w/ Labels:** Generates labeled map with (mostly) non-overlapping tags and red leader lines.  
+- Only currently visible legend items appear in the printout.
+- Automatically adds emergency shower/eyewash note when applicable. (Assumes that showers are plumbed with built in eyewash)
 
 ---
 
 ## How to Use
 
 ### Setup
-
-1. Place your site image in the same directory and name it:  
-   `facility-map.png`  
-   (Required format: PNG)
+1. Place your site map image in the same folder and name it:
+```Facility-Map.png```
+*(PNG format required)*
 
 2. Open `index.html` in any modern browser.  
-   No internet connection or installation required.
+*(No installation or internet required.)*
 
 ---
 
 ### User Mode
-
-- Hover over pins to view item type and label (if applicable).  
-- Use checkboxes in the legend to toggle visibility of layers.  
-- Use zoom and rotate controls to adjust view.
+- Hover over pins to display type and label.
+- Toggle layers via legend checkboxes.
+- Adjust zoom and rotation as needed.
+- Print or export without requiring admin access.
 
 ---
 
 ### Admin Mode
+1. Enter the password (default: `EHS-Admin`).
+- Note that this password is available to view as plaintext if the user opens the html in a text editor. This isn't true security, just enough to keep accidents from happening.
+3. Access all management tools:
+- Add new marker types or remove unused ones.
+- Modify type properties (shape, color, labeled status, abbreviation).
+- Toggle add mode and click map to drop new pins.
+- Manage existing pins from the admin table modal.
+- Import pins from prior versions.
+- Change password and save layout to persist all updates.
+3. Click **Save Layout** to download a new, fully updated version of the HTML file.
 
-1. Click "Admin Login" and enter password: `EHS-Admin` (case-sensitive)  
-2. Select item type from the dropdown  
-3. Click "Toggle Add Mode"  
-4. Click on the map to drop pins  
-5. If the item requires a label (e.g., Spill Kit, EP, etc.), a prompt will appear  
-6. Click "Save Layout" to export a new version of the HTML file with pins embedded  
-7. Optional: Click "Print" to generate a print-friendly map
-
-> Admin mode visibility is not preserved when saving—the exported HTML will always load in user mode by default.
+> The exported file always opens in user mode by default.
 
 ---
 
 ## Printing
-
-- Use the **Print** button or your browser's print dialog.  
-- Only layers currently visible will appear in the printout.  
-- Legend is auto-positioned and filtered accordingly.  
-- Recommended: "Fit to Page" and landscape orientation for best results.
+- Use **Print** for a basic visible map or **Print w/ Labels** for annotated output.  
+- Only visible layers are included.
+- Shower note appears only when Emergency Showers are displayed. (Assumes that showers are plumbed with built in eyewash)
+- Recommended settings: *Landscape orientation*, *Fit to Page*.
 
 ---
 
 ## License
-
 [MIT License]
 
 ---
 
 ## Notes
-
-- This project does not require any backend, dependencies, or frameworks.  
-- To share updates across a network, replace the original `index.html` with the newly exported `index.html`.
-
----
-
-## Customization
-
-- To change the admin password, locate this line in the HTML:
-
-```
-  const ADMIN_PWD = "EHS-Admin";
+- The system functions entirely client-side.
+- Updates are distributed simply by replacing the shared `index.html` file.
+- Ideal for compliance documentation, safety audits, and environmental reporting.
