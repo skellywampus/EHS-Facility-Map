@@ -46,7 +46,7 @@ It provides a visual, interactive method to locate, label, and document key safe
 
 ### Setup
 1. Place your site map image in the same folder and name it:
-```Facility-Map.png```
+```facility-map.png```
 *(PNG format required)*
 
 2. Open `index.html` in any modern browser.  
