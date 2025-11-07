@@ -1,1080 +1,819 @@
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Facility Map</title>
-    <style>
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
-      }
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Facility Map</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+    .app{display:grid;grid-template-columns:360px 1fr;height:100%}
+    .panel{padding:12px;border-right:1px solid #ddd;overflow:auto}
+    .panel h2{font-size:16px;margin:8px 0}
+    .panel h3{font-size:14px;margin:10px 0 6px}
+    .panel label{display:block;font-size:12px;margin:6px 0 3px}
+    .panel input[type=text],.panel input[type=password],.panel input[type=number],.panel select{width:100%;padding:6px;box-sizing:border-box}
+    .panel button{padding:6px 8px;margin:6px 0}
+    .row{display:flex;gap:8px;align-items:center}
+    .row>*{flex:1}
+    .grid{display:grid;gap:8px}
+    .grid.cols-2{grid-template-columns:1fr 1fr}
+    .pill{display:inline-block;padding:2px 6px;border-radius:10px;background:#eee;font-size:12px}
+    .sep{border-top:1px solid #e3e3e3;margin:10px 0}
+    .muted{color:#666;font-size:12px}
+    #stageWrap{position:relative;background:#f3f3f3}
+    #stage{width:100%;height:100%;display:block;background:#fafafa}
+    #tooltip{position:absolute;background:#fff;border:1px solid #ccc;font-size:12px;padding:4px 6px;pointer-events:none;display:none;white-space:nowrap;z-index:10;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+    .danger{background:#fee;border:1px solid #fcc;padding:8px;font-size:12px;display:none}
+    .legend{display:grid;gap:6px;font-size:12px}
+    .legend label{display:flex;align-items:center;gap:8px}
+    .legend .print-notes{display:none}
+    .table{width:100%;border-collapse:collapse;font-size:12px}
+    .table th,.table td{border:1px solid #e5e5e5;padding:6px;text-align:left}
+    .right{text-align:right}
+    .nowrap{white-space:nowrap}
+    .monospace{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:1000}
+    .modal{background:#fff;width:min(980px,94vw);max-height:90vh;overflow:auto;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+    .modal header{padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+    .modal header h3{margin:0;font-size:16px}
+    .modal .content{padding:14px 16px}
+    .modal .footer{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end}
+    @media print{
+      .legend label.print-hide{display:none!important}
+      .legend label input[type=checkbox]{display:none!important}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      .row,#authBox,#adminBox,#tooltip,.danger,button,input,select,.modal-overlay{display:none!important}
+      .panel label:not(.legend label){display:none!important}
+      .panel h1,.panel h2,.panel h3,.panel h4,.panel h5,.panel h6,.muted,.sep{display:none!important}
+      .panel{border:none!important;padding:0!important;width:auto!important}
+      .legend{position:absolute!important;bottom:10px;left:5px;background:#fff;border:1px solid #ccc;padding:6px 8px;font-size:10px;opacity:.95;z-index:9999;max-width:55%}
+      .legend label{display:flex;align-items:center;gap:6px}
+      .legend .print-notes{display:none}
+      .legend .print-notes.show{display:block;margin-top:6px;padding-top:6px;border-top:1px solid #ccc;font-size:10px;line-height:1.3}
+      .app{display:block!important}
+      #stageWrap,#stage{width:100%!important;height:auto!important}
+      @page{size:landscape;margin:.25in}
+    }
+  </style>
+</head>
+<body>
+  <!-- boot data -->
+  <script id="boot-data" type="application/json">{
+    "types": {
+      "ext":{"name":"Fire Extinguisher","color":"#dd3322","labeled":false,"shape":"circle","abbr":"FE"},
+      "spill":{"name":"Spill Kit","color":"#0b5","labeled":true,"shape":"pill","abbr":"SK"},
+      "aed":{"name":"AED","color":"#8b0000","labeled":false,"shape":"pill","abbr":"AED"},
+      "shower":{"name":"Emergency Shower","color":"#08c","labeled":false,"shape":"triangle","abbr":"SH"},
+      "eye":{"name":"Eyewash","color":"#6a3","labeled":false,"shape":"square","abbr":"EW"},
+      "ep":{"name":"Emission Point","color":"#7b1fa2","labeled":true,"shape":"pill","abbr":"EP"},
+      "swo":{"name":"Stormwater Outfall","color":"#1e88e5","labeled":true,"shape":"hex","abbr":"SWO"},
+      "bulk":{"name":"Bulk Chemical Storage","color":"#ef6c00","labeled":true,"shape":"square","abbr":"BULK"},
+      "waa":{"name":"Waste Accumulation Area","color":"#5d4037","labeled":true,"shape":"circle","abbr":"WAA"},
+      "safer":{"name":"Safer Area","color":"#2e7d32","labeled":true,"shape":"pill","abbr":"SAFE"},
+      "evac":{"name":"Evacuation Point","color":"#c2185b","labeled":true,"shape":"pill","abbr":"EVAC"}
+    },
+    "layers": {
+      "ext":true,"spill":true,"aed":true,"shower":true,"eye":true,
+      "ep":true,"swo":true,"bulk":true,"waa":true,"safer":true,"evac":true
+    },
+    "cfg": { "adminPwd": "EHS-Admin" }
+  }</script>
 
-      .app {
-        display: grid;
-        grid-template-columns: 320px 1fr;
-        height: 100%;
-      }
+  <div class="app">
+    <aside class="panel">
+      <h2>Facility Map</h2>
+      <div class="muted">Toggle items, change view, and print</div>
 
-      .panel {
-        padding: 12px;
-        border-right: 1px solid #ddd;
-        overflow: auto;
-      }
+      <div class="sep"></div>
+      <h3>Legend visibility</h3>
+      <div class="legend" id="legend">
+        <div id="printNotes" class="print-notes"></div>
+      </div>
 
-      .panel h2 {
-        font-size: 16px;
-        margin: 8px 0;
-      }
+      <div class="sep"></div>
+      <h3>View</h3>
+      <label>Zoom</label>
+      <div class="row">
+        <button id="zoomOut">-</button>
+        <button id="zoomReset">Reset</button>
+        <button id="zoomIn">+</button>
+      </div>
+      <label>Rotate degrees</label>
+      <div class="row">
+        <input type="number" id="rotateDeg" value="0" step="1">
+        <button data-rot="0">0</button><button data-rot="90">90</button><button data-rot="180">180</button><button data-rot="270">270</button>
+      </div>
+      <div class="row">
+        <button id="printBtn">Print Map</button>
+        <button id="printWithLabelsBtn">Print w Labels</button>
+      </div>
 
-      .panel h3 {
-        font-size: 14px;
-        margin: 10px 0 6px;
-      }
+      <div class="sep"></div>
+      <h3>Admin</h3>
+      <div id="authBox">
+        <label>Password</label>
+        <input type="password" id="pwd" placeholder="Password">
+        <button id="loginBtn">Login</button>
+      </div>
 
-      .panel label {
-        display: block;
-        font-size: 12px;
-        margin: 6px 0 3px;
-      }
+      <div id="adminBox" style="display:none;">
+        <div class="row" style="align-items:center;">
+          <span class="pill" id="status">Add Off</span>
+          <button id="logoutBtn">Logout</button>
+        </div>
 
-      .panel input[type="text"],
-      .panel input[type="password"],
-      .panel input[type="number"],
-      .panel select {
-        width: 100%;
-        padding: 6px;
-        box-sizing: border-box;
-      }
-
-      .panel button {
-        padding: 6px 8px;
-        margin: 6px 0;
-      }
-
-      .row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .row>* {
-        flex: 1;
-      }
-
-      #stageWrap {
-        position: relative;
-        background: #f3f3f3;
-      }
-
-      #stage {
-        width: 100%;
-        height: 100%;
-        display: block;
-        background: #fafafa;
-      }
-
-      .legend {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 6px;
-        font-size: 12px;
-      }
-
-      .legend label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .muted {
-        color: #666;
-        font-size: 12px;
-      }
-
-      .small {
-        font-size: 12px;
-      }
-
-      .sep {
-        border-top: 1px solid #e3e3e3;
-        margin: 10px 0;
-      }
-
-      .pill {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 10px;
-        background: #eee;
-        font-size: 12px;
-      }
-
-      .notice {
-        background: #f6f8ff;
-        border: 1px solid #dfe6ff;
-        padding: 8px;
-        font-size: 12px;
-      }
-
-      .danger {
-        background: #fee;
-        border: 1px solid #fcc;
-        padding: 8px;
-        font-size: 12px;
-        display: none;
-      }
-
-      #tooltip {
-        position: absolute;
-        background: #fff;
-        border: 1px solid #ccc;
-        font-size: 12px;
-        padding: 4px 6px;
-        pointer-events: none;
-        display: none;
-        white-space: nowrap;
-        z-index: 10;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, .1);
-      }
-    </style>
-    <style>
-      @media print {
-        @media print {
-
-          /* Hide entire legend row only if it has class print-hide */
-          .legend label.print-hide {
-            display: none !important;
-          }
-
-          /* Hide checkbox UI always on print */
-          .legend label input[type="checkbox"] {
-            display: none !important;
-          }
-        }
-
-        /* Ensure colors and backgrounds are preserved */
-        * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-
-        /* Hide non-essential UI */
-        .row,
-        #authBox,
-        #adminBox,
-        #tooltip,
-        .notice,
-        .danger,
-        button,
-        input,
-        select {
-          display: none !important;
-        }
-
-        /* Hide labels in panel EXCEPT legend labels */
-        .panel label:not(.legend label) {
-          display: none !important;
-        }
-
-        /* Hide all headings in sidebar */
-        .panel h1,
-        .panel h2,
-        .panel h3,
-        .panel h4,
-        .panel h5,
-        .panel h6,
-        .muted,
-        .sep {
-          display: none !important;
-        }
-
-        /* Panel reduced to only legend */
-        .panel {
-          border: none !important;
-          padding: 0 !important;
-          width: auto !important;
-        }
-
-        /* Legend floats on map */
-        .legend {
-          position: absolute !important;
-          bottom: 10px;
-          left: 5px;
-          background: #fff;
-          border: 1px solid #ccc;
-          padding: 6px;
-          font-size: 10px;
-          opacity: 0.9;
-          z-index: 9999;
-        }
-
-        .legend label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        /* Always hide the checkbox box itself */
-        .legend label input[type="checkbox"] {
-          display: none !important;
-        }
-
-        /* Hide unchecked rows completely */
-        .legend label input[type="checkbox"]:not(:checked) {
-          /* hide the parent row instead of the input */
-          display: none !important;
-        }
-
-        /* Expand map to page */
-        .app {
-          display: block !important;
-        }
-
-        #stageWrap,
-        #stage {
-          width: 100% !important;
-          height: auto !important;
-        }
-
-        /* Force landscape page */
-        @page {
-          size: landscape;
-          margin: 0.25in;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="app">
-      <aside class="panel">
-        <h2>Facility Map</h2>
-        <div class="muted small">A dynamic map that allows users to toggle items to only show relevant information.</div>
+        <label for="typeSel">Item type</label>
+        <select id="typeSel"></select>
         <div class="row">
-          <input type="file" id="pickImg" accept="image/*" style="display:none;">
+          <button id="addToggleBtn">Toggle Add Mode</button>
+          <button id="cancelAddBtn">Cancel</button>
         </div>
+
         <div class="sep"></div>
-        <h3>Legend (visibility)</h3>
-        <div class="legend" id="legend">
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <circle cx="9" cy="9" r="7" fill="#d32" stroke="white" stroke-width="2"></circle>
-              </svg>
-            </span>
-            <span>Fire Extinguisher</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:#0b5;color:#fff;font-weight:700;font-size:12px;text-align:center;">SK</span>
-            </span>
-            <span>Spill Kit</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <polygon points="9,2 16,16 2,16" fill="#08c" stroke="white" stroke-width="2"></polygon>
-              </svg>
-            </span>
-            <span>Emergency Shower</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <rect x="3" y="3" width="12" height="12" rx="3" fill="#6a3" stroke="white" stroke-width="2"></rect>
-              </svg>
-            </span>
-            <span>Eyewash</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:#7b1fa2;color:#fff;font-weight:700;font-size:12px;text-align:center;">EP</span>
-            </span>
-            <span>Emission Point</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <polygon points="4,5 9,2 14,5 14,13 9,16 4,13" fill="#1e88e5" stroke="white" stroke-width="2"></polygon>
-              </svg>
-            </span>
-            <span>Stormwater Outfall</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <rect x="3" y="3" width="12" height="12" rx="3" fill="#ef6c00" stroke="white" stroke-width="2"></rect>
-              </svg>
-            </span>
-            <span>Bulk Chemical Storage</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                <circle cx="9" cy="9" r="7" fill="#5d4037" stroke="white" stroke-width="2"></circle>
-              </svg>
-            </span>
-            <span>Waste Accumulation Area</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:#2e7d32;color:#fff;font-weight:700;font-size:12px;text-align:center;">SAFE</span>
-            </span>
-            <span>Safer Area</span>
-          </label>
-          <label>
-            <input type="checkbox">
-            <span>
-              <span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:#c2185b;color:#fff;font-weight:700;font-size:12px;text-align:center;">EVAC</span>
-            </span>
-            <span>Evacuation Point</span>
-          </label>
-        </div>
-        <div class="sep"></div>
-        <h3>View</h3>
-        <label>Zoom</label>
         <div class="row">
-          <button id="zoomOut">-</button>
-          <button id="zoomReset">Reset</button>
-          <button id="zoomIn">+</button>
+          <button id="saveLayoutBtn">Save Layout</button>
+          <button id="importPinsBtn">Import Pins</button>
+          <input type="file" id="importPinsFile" accept=".html,.htm,application/json,.json" style="display:none;">
         </div>
-        <label>Rotate (°)</label>
         <div class="row">
-          <input type="number" id="rotateDeg" value="0" step="1">
-          <button data-rot="0">0</button>
-          <button data-rot="90">90</button>
-          <button data-rot="180">180</button>
-          <button data-rot="270">270</button>
+          <button id="managePinsBtn">Manage Pins</button>
+          <button id="manageMarkersBtn">Manage Marker Types</button>
         </div>
-        <button onclick="window.print()">Print Map</button>
+
         <div class="sep"></div>
-        <h3>Admin</h3>
-        <div id="authBox">
-          <label>Password</label>
-          <input type="password" id="pwd" placeholder="Password">
-          <button id="loginBtn">Login</button>
-        </div>
-        <div id="adminBox" style="display:none;">
-          <div class="row" style="align-items:center;">
-            <span class="pill" id="status">Add: Off</span>
-            <button id="logoutBtn">Logout</button>
+        <h3>Password</h3>
+        <div class="grid cols-2">
+          <div>
+            <label>Current Password</label>
+            <input type="password" id="curAdminPwd" autocomplete="current-password">
           </div>
-          <label for="typeSel">Item type</label>
-          <select id="typeSel"></select>
+          <div>
+            <label>New Password</label>
+            <input type="password" id="newAdminPwd" autocomplete="new-password">
+          </div>
+          <div>
+            <label>Confirm New Password</label>
+            <input type="password" id="newAdminPwd2" autocomplete="new-password">
+          </div>
           <div class="row">
-            <button id="addToggleBtn">Toggle Add Mode</button>
-            <button id="cancelAddBtn">Cancel</button>
+            <button id="changeAdminPwdBtn">Change Password</button>
           </div>
-          <div class="sep"></div>
-          <div class="notice"> Click to add. Labeled types prompt for a label (Spill Kits → ##, Emission Points → EP##, Stormwater Outfalls, Bulk Chemical Storage, Waste Accumulation Areas, Safer Areas, Evacuation Points). Drag to move. Right-click to delete. </div>
-          <div class="row">
-            <button id="saveLayoutBtn">Save Layout</button>
+          <div class="muted">Save layout to persist changes</div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+      <div class="danger" id="warn"></div>
+    </aside>
+
+    <main id="stageWrap">
+      <canvas id="stage" width="1530" height="958"></canvas>
+      <div id="tooltip"></div>
+    </main>
+  </div>
+
+  <script id="initial-pin-data" type="application/json">[]</script>
+
+  <div class="modal-overlay" id="pinModalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
+      <header>
+        <h3 id="pinModalTitle">Pin</h3>
+        <button id="pinModalCloseBtn" aria-label="Close">✕</button>
+      </header>
+      <div class="content">
+        <div class="grid cols-2">
+          <div>
+            <label>Type</label>
+            <select id="pinTypeSel"></select>
+          </div>
+          <div id="pinLabelWrap" style="display:none;">
+            <label>Label</label>
+            <input type="text" id="pinLabelInput" placeholder="">
+          </div>
+          <div>
+            <label>X image px</label>
+            <input type="number" id="pinX" class="monospace">
+          </div>
+          <div>
+            <label>Y image px</label>
+            <input type="number" id="pinY" class="monospace">
           </div>
         </div>
+
         <div class="sep"></div>
-        <div class="danger" id="warn" style="display: none;"></div>
-      </aside>
-      <main id="stageWrap">
-        <canvas id="stage" width="1545" height="958"></canvas>
-        <div id="tooltip" style="display: none; left: 401px; top: 672px;">Fire Extinguisher</div>
-      </main>
+        <h4 style="margin:6px 0;">All Pins</h4>
+        <table class="table" id="pinTable">
+          <thead>
+            <tr>
+              <th class="nowrap">Type</th>
+              <th class="nowrap">Label</th>
+              <th class="nowrap">X</th>
+              <th class="nowrap">Y</th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pinTbody"></tbody>
+        </table>
+      </div>
+      <div class="footer">
+        <button id="pinDeleteBtn" style="margin-right:auto;">Delete</button>
+        <button id="pinCancelBtn">Cancel</button>
+        <button id="pinSaveBtn">Save</button>
+      </div>
     </div>
-    <!-- Embedded pin data (updated by Save Layout) -->
-    <script id="initial-pin-data" type="application/json">
-      [{}]
-    </script>
-    <script>
-      // --- Config ---
-      const ADMIN_PASSWORD = 'EHS-Admin';
-      const IMAGE_PATH = './facility-map.png';
-      const TYPES = {
-        ext: {
-          name: 'Fire Extinguisher',
-          color: '#d32',
-          labeled: false,
-          shape: 'circle'
-        },
-        spill: {
-          name: 'Spill Kit',
-          color: '#0b5',
-          labeled: true,
-          shape: 'pill'
-        },
-		aed: {
-          name: 'AED',
-          color: '#e53935',
-          labeled: false,
-          shape: 'pill'
-        },
-        shower: {
-          name: 'Emergency Shower',
-          color: '#08c',
-          labeled: false,
-          shape: 'triangle'
-        },
-        eye: {
-          name: 'Eyewash',
-          color: '#6a3',
-          labeled: false,
-          shape: 'square'
-        },
-        ep: {
-          name: 'Emission Point',
-          color: '#7b1fa2',
-          labeled: true,
-          shape: 'pill'
-        },
-        swo: {
-          name: 'Stormwater Outfall',
-          color: '#1e88e5',
-          labeled: true,
-          shape: 'hex'
-        },
-        bulk: {
-          name: 'Bulk Chemical Storage',
-          color: '#ef6c00',
-          labeled: true,
-          shape: 'square'
-        },
-        waa: {
-          name: 'Waste Accumulation Area',
-          color: '#5d4037',
-          labeled: true,
-          shape: 'circle'
-        },
-        safer: {
-          name: 'Safer Area',
-          color: '#2e7d32',
-          labeled: true,
-          shape: 'pill'
-        },
-        evac: {
-          name: 'Evacuation Point',
-          color: '#c2185b',
-          labeled: true,
-          shape: 'pill'
-        },
+  </div>
+
+  <div class="modal-overlay" id="markerModalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="markerModalTitle">
+      <header>
+        <h3 id="markerModalTitle">Marker Types</h3>
+        <button id="markerModalCloseBtn" aria-label="Close">✕</button>
+      </header>
+      <div class="content">
+        <h4 style="margin:6px 0;">Existing Types</h4>
+        <table class="table" id="typesTable">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Name</th>
+              <th>Shape</th>
+              <th class="nowrap">Labeled</th>
+              <th>Color</th>
+              <th>Hue</th>
+              <th>Abbr</th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="typesTbody"></tbody>
+        </table>
+
+        <div class="sep"></div>
+        <h4 style="margin:6px 0;">Add New Type</h4>
+        <div class="grid cols-2">
+          <div>
+            <label>Key</label>
+            <input type="text" id="newTypeKey" placeholder="e g firstaid">
+          </div>
+          <div>
+            <label>Name</label>
+            <input type="text" id="newTypeName" placeholder="e g First Aid">
+          </div>
+          <div>
+            <label>Shape</label>
+            <select id="newTypeShape">
+              <option value="circle">Circle</option>
+              <option value="square">Square</option>
+              <option value="triangle">Triangle</option>
+              <option value="diamond">Diamond</option>
+              <option value="hex">Hex</option>
+              <option value="pill">Pill</option>
+            </select>
+          </div>
+          <div class="row">
+            <label style="flex:0 0 auto;">Labeled</label>
+            <input type="checkbox" id="newTypeLabeled"/>
+          </div>
+          <div>
+            <label>Color</label>
+            <input type="color" id="newTypeColor" value="#00897b">
+          </div>
+          <div>
+            <label>Hue Slider</label>
+            <input type="range" id="newTypeHue" min="0" max="360" value="170">
+          </div>
+          <div>
+            <label>Abbreviation optional</label>
+            <input type="text" id="newTypeAbbr" placeholder="e g FA">
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button id="markerCancelBtn">Close</button>
+        <button id="addTypeBtn">Add Type</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* init */
+    const IMAGE_PATH='./facility-map.png';
+    const PINMAP='./facility-pins.json';
+
+    let TYPES={};
+    let LAYERS={};
+    let adminPwd='';
+
+    const state={isAdmin:false,addMode:false,selectedType:'',img:null,imgW:0,imgH:0,zoom:1,panX:0,panY:0,rotDeg:0,points:[],dragging:{id:null,dx:0,dy:0},hoverId:null,printLabels:false,editingPinId:null};
+
+    const canvas=document.getElementById('stage'); const ctx=canvas.getContext('2d'); const wrap=document.getElementById('stageWrap');
+    const tooltip=document.getElementById('tooltip'); const warnBox=document.getElementById('warn');
+
+    const pinModalOverlay=document.getElementById('pinModalOverlay'); const pinModalCloseBtn=document.getElementById('pinModalCloseBtn');
+    const pinTypeSel=document.getElementById('pinTypeSel'); const pinLabelWrap=document.getElementById('pinLabelWrap'); const pinLabelInput=document.getElementById('pinLabelInput');
+    const pinX=document.getElementById('pinX'); const pinY=document.getElementById('pinY'); const pinSaveBtn=document.getElementById('pinSaveBtn');
+    const pinCancelBtn=document.getElementById('pinCancelBtn'); const pinDeleteBtn=document.getElementById('pinDeleteBtn'); const pinTbody=document.getElementById('pinTbody');
+
+    const markerModalOverlay=document.getElementById('markerModalOverlay'); const markerModalCloseBtn=document.getElementById('markerModalCloseBtn');
+    const markerCancelBtn=document.getElementById('markerCancelBtn'); const typesTbody=document.getElementById('typesTbody');
+    const addTypeBtn=document.getElementById('addTypeBtn'); const newTypeKey=document.getElementById('newTypeKey'); const newTypeName=document.getElementById('newTypeName');
+    const newTypeShape=document.getElementById('newTypeShape'); const newTypeLabeled=document.getElementById('newTypeLabeled');
+    const newTypeColor=document.getElementById('newTypeColor'); const newTypeHue=document.getElementById('newTypeHue'); const newTypeAbbr=document.getElementById('newTypeAbbr');
+
+    function applyBoot(){
+      const el=document.getElementById('boot-data'); if(!el) return;
+      let j={}; try{ j=JSON.parse(el.textContent||'{}'); }catch{}
+      if(j.types&&typeof j.types==='object') TYPES=j.types;
+      if(j.layers&&typeof j.layers==='object') LAYERS=j.layers;
+      if(j.cfg&&typeof j.cfg.adminPwd==='string') adminPwd=j.cfg.adminPwd;
+
+      for(const k of Object.keys(TYPES)) if(!(k in LAYERS)) LAYERS[k]=true;
+      for(const k of Object.keys(LAYERS)) if(!TYPES[k]) delete LAYERS[k];
+
+      state.selectedType=Object.keys(TYPES)[0]||'';
+    }
+
+    function buildLegend(){
+      const legend=document.getElementById('legend'); legend.innerHTML='';
+      for(const k of Object.keys(TYPES)){
+        const row=document.createElement('label'); row.dataset.type=k;
+        const chk=document.createElement('input'); chk.type='checkbox'; chk.checked=!!LAYERS[k];
+        chk.onchange=()=>{ LAYERS[k]=chk.checked; draw(); };
+        const icon=document.createElement('span'); icon.innerHTML=iconHTML(k);
+        const name=document.createElement('span'); name.textContent=TYPES[k].name;
+        row.appendChild(chk); row.appendChild(icon); row.appendChild(name); legend.appendChild(row);
+      }
+      const notesEl=document.createElement('div'); notesEl.id='printNotes'; notesEl.className='print-notes'; legend.appendChild(notesEl);
+    }
+
+    function buildTypeSelect(){
+      const typeSel=document.getElementById('typeSel'); typeSel.innerHTML='';
+      for(const k of Object.keys(TYPES)){ const o=document.createElement('option'); o.value=k; o.textContent=TYPES[k].name; typeSel.appendChild(o); }
+      if(!(state.selectedType in TYPES)) state.selectedType=Object.keys(TYPES)[0]||'';
+      typeSel.value=state.selectedType; typeSel.onchange=()=>{ state.selectedType=typeSel.value; setStatus(); };
+      setStatus();
+    }
+
+    function setStatus(){ document.getElementById('status').textContent='Add '+(state.addMode?('On '+(TYPES[state.selectedType]?.name||state.selectedType)):'Off'); }
+    function warn(msg){ warnBox.textContent=msg||''; warnBox.style.display=msg?'block':'none'; }
+
+    function bindViewControls(){
+      document.getElementById('zoomIn').onclick=()=>{ state.zoom*=1.25; draw(); };
+      document.getElementById('zoomOut').onclick=()=>{ state.zoom/=1.25; draw(); };
+      document.getElementById('zoomReset').onclick=()=>{ resetView(); draw(); };
+      const rotateDeg=document.getElementById('rotateDeg');
+      rotateDeg.onchange=()=>{ state.rotDeg=(+rotateDeg.value)||0; draw(); };
+      document.querySelectorAll('[data-rot]').forEach(btn=>btn.onclick=()=>{ rotateDeg.value=btn.getAttribute('data-rot'); state.rotDeg=(+rotateDeg.value)||0; draw(); });
+    }
+
+    function bindPrintControls(){
+      document.getElementById('printBtn').onclick=()=>window.print();
+      document.getElementById('printWithLabelsBtn').onclick=()=>{
+        state.printLabels=true; updateLegendForPrint(); draw();
+        setTimeout(()=>{ window.print(); setTimeout(()=>{ state.printLabels=false; cleanupLegendAfterPrint(); draw(); },100); },100);
       };
-      const LAYERS = Object.keys(TYPES).reduce((a, k) => (a[k] = true, a), {});
-      // --- State ---
-      const state = {
-        isAdmin: false, // ensure not logged in by default
-        addMode: false,
-        selectedType: 'ext',
-        img: null,
-        imgW: 0,
-        imgH: 0,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-        rotDeg: 0,
-        points: [],
-        dragging: {
-          id: null,
-          dx: 0,
-          dy: 0
-        },
-        hoverId: null
-      };
-      // --- DOM ---
-      const canvas = document.getElementById('stage');
-      const ctx = canvas.getContext('2d');
-      const wrap = document.getElementById('stageWrap');
-      const tooltip = document.getElementById('tooltip');
-      const warnBox = document.getElementById('warn');
-      // --- UI init ---
-      (function initUI() {
-        // Legend with checkboxes
-        const legend = document.getElementById('legend');
-        legend.innerHTML = '';
-        for (const k of Object.keys(TYPES)) {
-          const row = document.createElement('label');
-          const chk = document.createElement('input');
-          chk.type = 'checkbox';
-          chk.checked = true;
-          chk.onchange = () => {
-            LAYERS[k] = chk.checked;
-            draw();
-          };
-          const icon = document.createElement('span');
-          icon.innerHTML = iconHTML(k);
-          const name = document.createElement('span');
-          name.textContent = TYPES[k].name;
-          row.appendChild(chk);
-          row.appendChild(icon);
-          row.appendChild(name);
-          legend.appendChild(row);
+      window.addEventListener('beforeprint',updateLegendForPrint);
+      window.addEventListener('afterprint',cleanupLegendAfterPrint);
+    }
+
+    function doLogin(){
+      if(document.getElementById('pwd').value===adminPwd){
+        state.isAdmin=true; document.getElementById('authBox').style.display='none'; document.getElementById('adminBox').style.display=''; draw();
+      } else { alert('Incorrect password'); }
+    }
+    function bindAuthControls(){
+      const pwdInput=document.getElementById('pwd');
+      document.getElementById('loginBtn').onclick=doLogin;
+      pwdInput.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+      document.getElementById('logoutBtn').onclick=()=>{ state.isAdmin=false; state.addMode=false; document.getElementById('adminBox').style.display='none'; document.getElementById('authBox').style.display=''; draw(); };
+    }
+
+    function bindAdminControls(){
+      document.getElementById('addToggleBtn').onclick=()=>{ state.addMode=!state.addMode; setStatus(); };
+      document.getElementById('cancelAddBtn').onclick=()=>{ state.addMode=false; setStatus(); };
+      document.getElementById('saveLayoutBtn').onclick=saveLayout;
+      document.getElementById('managePinsBtn').addEventListener('click',openPinManager);
+      document.getElementById('manageMarkersBtn').addEventListener('click',openMarkerManager);
+      document.getElementById('importPinsBtn').onclick=()=>document.getElementById('importPinsFile').click();
+      document.getElementById('importPinsFile').addEventListener('change',onImportPins);
+    }
+
+    function bindPasswordChange(){
+      document.getElementById('changeAdminPwdBtn').addEventListener('click',()=>{
+        const cur=document.getElementById('curAdminPwd').value;
+        const n1=document.getElementById('newAdminPwd').value;
+        const n2=document.getElementById('newAdminPwd2').value;
+        if(cur!==adminPwd){ alert('Current password incorrect'); return; }
+        if(!n1||n1.length<4){ alert('New password too short'); return; }
+        if(n1!==n2){ alert('Passwords do not match'); return; }
+        adminPwd=n1;
+        document.getElementById('curAdminPwd').value='';
+        document.getElementById('newAdminPwd').value='';
+        document.getElementById('newAdminPwd2').value='';
+        alert('Password updated save layout to persist');
+      });
+    }
+
+    function resize(){ canvas.width=wrap.clientWidth; canvas.height=wrap.clientHeight; draw(); }
+    window.addEventListener('resize',resize);
+
+    const img=new Image();
+    img.onload=()=>{ state.img=img; state.imgW=img.naturalWidth; state.imgH=img.naturalHeight; resetView(); buildLegend(); buildTypeSelect(); if(!loadEmbeddedPins()){ loadSavedPoints().then(()=>draw()); } else { draw(); } warn(''); };
+    img.onerror=()=>{ warn('Map image failed to load'); draw(); };
+    img.src=IMAGE_PATH;
+
+    function resetView(){
+      const s=Math.min(wrap.clientWidth/state.imgW,wrap.clientHeight/state.imgH);
+      state.zoom=s; state.panX=(wrap.clientWidth-state.imgW*s)/2; state.panY=(wrap.clientHeight-state.imgH*s)/2;
+    }
+    function deg2rad(d){ return d*Math.PI/180; }
+    function imageToScreen(ix,iy){
+      const cx=state.imgW/2,cy=state.imgH/2,a=deg2rad(state.rotDeg); const dx=ix-cx,dy=iy-cy;
+      const rx=dx*Math.cos(a)-dy*Math.sin(a)+cx, ry=dx*Math.sin(a)+dy*Math.cos(a)+cy;
+      return {sx:rx*state.zoom+state.panX, sy:ry*state.zoom+state.panY};
+    }
+    function screenToImage(sx,sy){
+      const rx=(sx-state.panX)/state.zoom, ry=(sy-state.panY)/state.zoom;
+      const cx=state.imgW/2,cy=state.imgH/2,a=-deg2rad(state.rotDeg); const dx=rx-cx,dy=ry-cy;
+      const ix=dx*Math.cos(a)-dy*Math.sin(a)+cx, iy=dx*Math.sin(a)+dy*Math.cos(a)+cy;
+      return {ix,iy};
+    }
+
+    function addPoint(x,y,type,label){ state.points.push({id:crypto.randomUUID(),type,x,y,label}); }
+    function getPoint(id){ return state.points.find(p=>p.id===id); }
+    function delPoint(id){ state.points=state.points.filter(p=>p.id!==id); draw(); }
+
+    function clear(){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+    function draw(){
+      clear(); if(!state.img) return;
+      ctx.save(); ctx.translate(state.panX,state.panY); ctx.scale(state.zoom,state.zoom);
+      ctx.translate(state.imgW/2,state.imgH/2); ctx.rotate(deg2rad(state.rotDeg)); ctx.translate(-state.imgW/2,-state.imgH/2);
+      ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high'; ctx.drawImage(state.img,0,0); ctx.restore();
+      const visible=[];
+      for(const p of state.points){ if(LAYERS[p.type]){ drawPoint(p); visible.push(p); } }
+      if(state.printLabels){ const markerRects=visible.map(p=>getMarkerBounds(p)); const placements=layoutLabels(visible,markerRects); drawPrintLabels(placements,markerRects); }
+    }
+
+    function drawPoint(p){
+      const cfg=TYPES[p.type]; if(!cfg) return;
+      const pos=imageToScreen(p.x,p.y); const size=12;
+      ctx.save(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.fillStyle=cfg.color;
+      if(cfg.shape==='circle'){ circle(pos.sx,pos.sy,size); ctx.fill(); ctx.stroke(); }
+      else if(cfg.shape==='square'){ rectRound(pos.sx-size,pos.sy-size,size*2,size*2,3); ctx.fill(); ctx.stroke(); }
+      else if(cfg.shape==='triangle'){ triangle(pos.sx,pos.sy,size); ctx.fill(); ctx.stroke(); }
+      else if(cfg.shape==='diamond'){ diamond(pos.sx,pos.sy,size); ctx.fill(); ctx.stroke(); }
+      else if(cfg.shape==='hex'){ hexagon(pos.sx,pos.sy,size); ctx.fill(); ctx.stroke(); }
+      else if(cfg.shape==='pill'){
+        const txt=markerTextFor(p); const padX=8,h=20; ctx.font='bold 12px system-ui, Arial';
+        const w=Math.max(28,Math.ceil(ctx.measureText(txt).width)+padX*2);
+        pill(pos.sx,pos.sy,w,h); ctx.fillStyle=cfg.color; ctx.fill(); ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,pos.sx,pos.sy);
+      }
+      ctx.restore();
+      function circle(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); }
+      function rectRound(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
+      function triangle(x,y,s){ ctx.beginPath(); ctx.moveTo(x,y-s); ctx.lineTo(x+s*.866,y+s*.5); ctx.lineTo(x-s*.866,y+s*.5); ctx.closePath(); }
+      function diamond(x,y,s){ ctx.beginPath(); ctx.moveTo(x,y-s); ctx.lineTo(x+s,y); ctx.lineTo(x,y+s); ctx.lineTo(x-s,y); ctx.closePath(); }
+      function hexagon(x,y,s){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=deg2rad(60*i-30); const px=x+s*Math.cos(a),py=y+s*Math.sin(a); i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath(); }
+      function pill(x,y,w,h){ const r=h/2; ctx.beginPath(); ctx.moveTo(x-w/2+r,y-h/2); ctx.arcTo(x+w/2,y-h/2,x+w/2,y+h/2,r); ctx.arcTo(x+w/2,y+h/2,x-w/2,y+h/2,r); ctx.arcTo(x-w/2,y+h/2,x-w/2,y-h/2,r); ctx.arcTo(x-w/2,y-h/2,x+w/2,y-h/2,r); }
+    }
+
+    function markerTextFor(p){
+      const cfg=TYPES[p.type]; if(!cfg) return '';
+      let txt=(p.label||'').trim();
+      if(p.type==='spill') txt=txt||'00';
+      else if(p.type==='aed') txt='AED';
+      else if(p.type==='ep'){ if(!txt) txt='EP'; else if(!/^EP/i.test(txt)) txt='EP'+txt; }
+      else if(cfg.labeled) txt=txt||(cfg.abbr||autoAbbr(p.type));
+      if(!cfg.labeled && cfg.shape==='pill') txt=cfg.abbr||autoAbbr(p.type);
+      if(cfg.shape!=='pill' && !cfg.labeled) txt=cfg.abbr||autoAbbr(p.type);
+      return txt;
+    }
+    function autoAbbr(key){
+      if(TYPES[key]?.abbr) return TYPES[key].abbr;
+      const name=TYPES[key]?.name||key; const letters=name.match(/\b([A-Za-z])/g);
+      return letters?letters.join('').toUpperCase().slice(0,6):String(key).toUpperCase().slice(0,6);
+    }
+    function getMarkerBounds(p){
+      const cfg=TYPES[p.type]; if(!cfg) return {x:0,y:0,w:0,h:0};
+      const pos=imageToScreen(p.x,p.y);
+      if(cfg.shape==='pill'){
+        const txt=markerTextFor(p); ctx.save(); ctx.font='bold 12px system-ui, Arial';
+        const padX=8,h=20; const w=Math.max(28,Math.ceil(ctx.measureText(txt).width)+padX*2); ctx.restore();
+        return {x:Math.round(pos.sx-w/2),y:Math.round(pos.sy-h/2),w:Math.round(w),h:Math.round(h)};
+      } else { const r=14; return {x:Math.round(pos.sx-r),y:Math.round(pos.sy-r),w:r*2,h:r*2}; }
+    }
+
+    function measureTagText(p){
+      const cfg=TYPES[p.type]; let tag='';
+      if(cfg?.labeled){ tag=(p.label||'').trim(); if(p.type==='ep'){ if(!tag) tag='EP'; else if(!/^EP/i.test(tag)) tag='EP'+tag; } if(!tag) tag=(cfg?.abbr)||autoAbbr(p.type); }
+      else { tag=(cfg?.abbr)||autoAbbr(p.type); }
+      ctx.save(); ctx.font='bold 11px system-ui, Arial'; const tw=Math.ceil(ctx.measureText(tag).width); ctx.restore();
+      const padX=6,h=18,w=tw+padX*2; return {tag,w,h};
+    }
+    function rectsOverlap(a,b,margin=2){ return !(a.x+a.w+margin<=b.x-margin||b.x+b.w+margin<=a.x-margin||a.y+a.h+margin<=b.y-margin||b.y+b.h+margin<=a.y-margin); }
+    function candidatePositions(sx,sy,w,h){
+      const bases=[[16,-18],[16,18],[-16,-18],[-16,18],[0,-24],[24,0],[-24,0],[0,24],[32,-12],[-32,-12],[32,12],[-32,12]];
+      const out=[]; for(let r=1;r<=10;r++){ for(const [dx,dy] of bases) out.push([sx+dx*r,sy+dy*r]); }
+      return out.map(([cx,cy])=>({x:Math.round(cx-w/2),y:Math.round(cy-h/2)}));
+    }
+    function layoutLabels(pts,markerRects){
+      const placed=[]; const sorted=pts.slice().sort((a,b)=>{const A=imageToScreen(a.x,a.y),B=imageToScreen(b.x,b.y); return A.sy-B.sy;});
+      for(const p of sorted){
+        const pos=imageToScreen(p.x,p.y); const m=measureTagText(p); const cands=candidatePositions(pos.sx,pos.sy,m.w,m.h); let box=null;
+        for(const cand of cands){
+          const test={x:cand.x,y:cand.y,w:m.w,h:m.h}; let hit=false;
+          for(const q of placed){ if(rectsOverlap(test,q,2)){ hit=true; break; } }
+          if(hit) continue; for(const mr of markerRects){ if(rectsOverlap(test,mr,2)){ hit=true; break; } }
+          if(!hit){ box=test; break; }
         }
-        // Type select
-        const typeSel = document.getElementById('typeSel');
-        for (const k of Object.keys(TYPES)) {
-          const o = document.createElement('option');
-          o.value = k;
-          o.textContent = TYPES[k].name;
-          typeSel.appendChild(o);
+        if(!box) box={x:cands[cands.length-1].x,y:cands[cands.length-1].y,w:m.w,h:m.h};
+        placed.push({...box,tag:m.tag,sx:pos.sx,sy:pos.sy,type:p.type});
+      }
+      return placed;
+    }
+
+    function orient(ax,ay,bx,by,cx,cy){ return Math.sign((bx-ax)*(cy-ay)-(by-ay)*(cx-ax)); }
+    function onSeg(ax,ay,bx,by,px,py){ return Math.min(ax,bx)-1e-6<=px&&px<=Math.max(ax,bx)+1e-6&&Math.min(ay,by)-1e-6<=py&&py<=Math.max(ay,by)+1e-6; }
+    function segIntersect(a,b,c,d){
+      const o1=orient(a.x,a.y,b.x,b.y,c.x,c.y),o2=orient(a.x,a.y,b.x,b.y,d.x,d.y),o3=orient(c.x,c.y,d.x,d.y,a.x,a.y),o4=orient(c.x,c.y,d.x,d.y,b.x,b.y);
+      if(o1*o2<0&&o3*o4<0) return true; if(o1===0&&onSeg(a.x,a.y,b.x,b.y,c.x,c.y)) return true; if(o2===0&&onSeg(a.x,a.y,b.x,b.y,d.x,d.y)) return true; if(o3===0&&onSeg(c.x,c.y,d.x,d.y,a.x,a.y)) return true; if(o4===0&&onSeg(c.x,c.y,d.x,d.y,b.x,b.y)) return true; return false;
+    }
+    function segHitsAny(seg,segs){
+      for(const s of segs){
+        const shared=(Math.abs(seg.a.x-s.a.x)<1e-6&&Math.abs(seg.a.y-s.a.y)<1e-6)||(Math.abs(seg.a.x-s.b.x)<1e-6&&Math.abs(seg.a.y-s.b.y)<1e-6)||(Math.abs(seg.b.x-s.a.x)<1e-6&&Math.abs(seg.b.y-s.a.y)<1e-6)||(Math.abs(seg.b.x-s.b.x)<1e-6&&Math.abs(seg.b.y-s.b.y)<1e-6);
+        if(shared) continue; if(segIntersect(seg.a,seg.b,s.a,s.b)) return true;
+      }
+      return false;
+    }
+    function segHitsRects(seg,rects,margin=2){
+      const a={x:seg.a.x,y:seg.a.y},b={x:seg.b.x,y:seg.b.y};
+      for(const r of rects){
+        const rx=r.x-margin,ry=r.y-margin,rw=r.w+margin*2,rh=r.h+margin*2;
+        if(a.x>=rx&&a.x<=rx+rw&&a.y>=ry&&a.y<=ry+rh) return true;
+        if(b.x>=rx&&b.x<=rx+rw&&b.y>=ry&&b.y<=ry+rh) return true;
+        const edges=[{a:{x:rx,y:ry},b:{x:rx+rw,y:ry}},{a:{x:rx+rw,y:ry},b:{x:rx+rw,y:ry+rh}},{a:{x:rx+rw,y:ry+rh},b:{x:rx,y:ry+rh}},{a:{x:rx,y:ry+rh},b:{x:rx,y:ry}}];
+        for(const e of edges){ if(segIntersect(a,b,e.a,e.b)) return true; }
+      }
+      return false;
+    }
+    function closestPointOnRect(px,py,rx,ry,rw,rh){ const x=Math.max(rx,Math.min(px,rx+rw)); const y=Math.max(ry,Math.min(py,ry+rh)); return {x,y}; }
+    function routeLeader(sx,sy,ax,ay,segs,rects){
+      const tryPath=ss=>{ for(const s of ss){ if(segHitsAny(s,segs)) return false; if(segHitsRects(s,rects)) return false; } return true; };
+      const direct=[{a:{x:sx,y:sy},b:{x:ax,y:ay}}]; if(tryPath(direct)) return direct;
+      const signX=Math.sign(ax-sx)||1,signY=Math.sign(ay-sy)||1,OFFS=[6,10,14,18,22,26,30,36,42,50];
+      for(const off of OFFS){
+        const p1={x:sx,y:sy},p2={x:sx,y:sy+signY*off},p3={x:ax,y:sy+signY*off},p4={x:ax,y:ay}; const path1=[{a:p1,b:p2},{a:p2,b:p3},{a:p3,b:p4}]; if(tryPath(path1)) return path1;
+        const q1={x:sx,y:sy},q2={x:sx+signX*off,y:sy},q3={x:sx+signX*off,y:ay},q4={x:ax,y:ay}; const path2=[{a:q1,b:q2},{a:q2,b:q3},{a:q3,b:q4}]; if(tryPath(path2)) return path2;
+      }
+      for(const off of OFFS){ const mid={x:ax,y:ay+((Math.random()>0.5)?off:-off)}; const path=[{a:{x:sx,y:sy},b:mid},{a:mid,b:{x:ax,y:ay}}]; if(tryPath(path)) return path; }
+      return direct;
+    }
+    function drawPrintLabels(placements,markerRects){
+      const labelRects=placements.map(L=>({x:L.x,y:L.y,w:L.w,h:L.h})); const avoidRects=markerRects.concat(labelRects); const drawnSegs=[];
+      ctx.save(); ctx.lineWidth=1.5; ctx.strokeStyle='#c00';
+      for(const L of placements){
+        const attach=closestPointOnRect(L.sx,L.sy,L.x,L.y,L.w,L.h); const path=routeLeader(L.sx,L.sy,attach.x,attach.y,drawnSegs,avoidRects);
+        for(const seg of path){ ctx.beginPath(); ctx.moveTo(seg.a.x,seg.a.y); ctx.lineTo(seg.b.x,seg.b.y); ctx.stroke(); drawnSegs.push(seg); }
+      }
+      ctx.restore();
+      ctx.save(); ctx.font='bold 11px system-ui, Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      for(const L of placements){ ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; drawRoundedRect(L.x,L.y,L.w,L.h,L.h/2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#000'; ctx.fillText(L.tag,L.x+L.w/2,L.y+L.h/2); }
+      ctx.restore();
+    }
+    function drawRoundedRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+    function iconHTML(type){
+      const cfg=TYPES[type]; if(!cfg) return ''; const c=cfg.color||'#999';
+      if(cfg.shape==='pill'){
+        const text=type==='spill'?'SK':type==='aed'?'AED':type==='ep'?'EP':(cfg.abbr||autoAbbr(type));
+        return '<span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:'+c+';color:#fff;font-weight:700;font-size:12px;text-align:center;">'+text+'</span>';
+      }
+      if(cfg.shape==='circle') return svg('<circle cx="9" cy="9" r="7" fill="'+c+'" stroke="white" stroke-width="2"/>');
+      if(cfg.shape==='square') return svg('<rect x="3" y="3" width="12" height="12" rx="3" fill="'+c+'" stroke="white" stroke-width="2"/>');
+      if(cfg.shape==='triangle') return svg('<polygon points="9,2 16,16 2,16" fill="'+c+'" stroke="white" stroke-width="2"/>');
+      if(cfg.shape==='diamond') return svg('<polygon points="9,2 16,9 9,16 2,9" fill="'+c+'" stroke="white" stroke-width="2"/>');
+      if(cfg.shape==='hex') return svg('<polygon points="4,5 9,2 14,5 14,13 9,16 4,13" fill="'+c+'" stroke="white" stroke-width="2"/>');
+      function svg(inner){ return '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">'+inner+'</svg>'; }
+    }
+
+    function saveLayout(){
+      try{
+        for(const k of Object.keys(TYPES)) if(!(k in LAYERS)) LAYERS[k]=true;
+        for(const k of Object.keys(LAYERS)) if(!TYPES[k]) delete LAYERS[k];
+
+        const bootObj={ types:TYPES, layers:LAYERS, cfg:{ adminPwd } };
+        const bootJson=JSON.stringify(bootObj,null,2).replace(/<\/script/gi,'<\\/script>');
+
+        let html=document.documentElement.outerHTML;
+
+        const bootRe=/<script\s+id="boot-data"[^>]*>[\s\S]*?<\/script>/i;
+        const bootTag='<script id="boot-data" type="application/json">'+bootJson+'</'+'script>';
+        if(bootRe.test(html)) html=html.replace(bootRe,bootTag); else html=html.replace('</body>',bootTag+'</body>');
+
+        const pinsJson=JSON.stringify(state.points,null,2).replace(/<\/script/gi,'<\\/script>');
+        const pinsRe=/<script\s+id="initial-pin-data"[^>]*>[\s\S]*?<\/script>/i;
+        const pinsTag='<script id="initial-pin-data" type="application/json">'+pinsJson+'</'+'script>';
+        if(pinsRe.test(html)) html=html.replace(pinsRe,pinsTag); else html=html.replace('</body>',pinsTag+'</body>');
+
+        html=html.replace(/<div id="adminBox"[^>]*>/i,m=>/style=/i.test(m)?m.replace(/style="[^"]*"/i,'style="display:none;"'):m.replace(/>$/,' style="display:none;">'));
+        html=html.replace(/<div id="authBox"[^>]*>/i,m=>/style=/i.test(m)?m.replace(/style="[^"]*"/i,''):m);
+        html=html.replace(/(<input[^>]*id="pwd"[^>]*?)\s*value="[^"]*"/i,"$1");
+
+        const blob=new Blob([html],{type:'text/html'}); const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download='index.html'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+      }catch(err){ console.error(err); alert('Export failed'); }
+    }
+
+    function updateLegendForPrint(){
+      document.querySelectorAll('.legend label').forEach(lbl=>{ const cb=lbl.querySelector('input[type="checkbox"]'); if(cb&&!cb.checked) lbl.classList.add('print-hide'); });
+      const notesEl=document.getElementById('printNotes');
+      const showerRow=[...document.querySelectorAll('#legend label')].find(l=>l.dataset.type==='shower');
+      const showNote=!!(showerRow&&showerRow.querySelector('input[type="checkbox"]')?.checked);
+      if(showNote){ notesEl.textContent='All emergency showers are plumbed and include a built in eyewash.'; notesEl.classList.add('show'); }
+      else { notesEl.textContent=''; notesEl.classList.remove('show'); }
+    }
+    function cleanupLegendAfterPrint(){
+      document.querySelectorAll('.legend label.print-hide').forEach(lbl=>lbl.classList.remove('print-hide'));
+      const notesEl=document.getElementById('printNotes'); notesEl.textContent=''; notesEl.classList.remove('show');
+    }
+
+    function hitTest(sx,sy){
+      for(let i=state.points.length-1;i>=0;i--){ const p=state.points[i]; if(!LAYERS[p.type]) continue; const q=imageToScreen(p.x,p.y); if(Math.hypot(q.sx-sx,q.sy-sy)<14) return p.id; }
+      return null;
+    }
+    let isPanning=false,lastX=0,lastY=0;
+
+    canvas.addEventListener('wheel',e=>{
+      e.preventDefault(); const mx=e.offsetX,my=e.offsetY; const dz=Math.pow(1.0015,-e.deltaY);
+      const z1=Math.max(.05,Math.min(20,state.zoom*dz)); const loc=screenToImage(mx,my); state.zoom=z1; const back=imageToScreen(loc.ix,loc.iy);
+      state.panX+=mx-back.sx; state.panY+=my-back.sy; draw();
+    },{passive:false});
+
+    canvas.addEventListener('mousemove',e=>{
+      const mx=e.offsetX,my=e.offsetY; const id=hitTest(mx,my); state.hoverId=id;
+      if(id){
+        const p=getPoint(id); const label=(TYPES[p.type]?.labeled&&p.label)?(p.type==='ep'&&!/^EP/i.test(p.label)?'EP'+p.label:p.label):'';
+        tooltip.textContent=(TYPES[p.type]?.name||p.type)+(label?': '+label:''); tooltip.style.left=(mx+12)+'px'; tooltip.style.top=(my+12)+'px'; tooltip.style.display='block';
+      } else { tooltip.style.display='none'; }
+      if(state.dragging.id){ const pt=screenToImage(mx-state.dragging.dx,my-state.dragging.dy); const p=getPoint(state.dragging.id); if(p){ p.x=pt.ix; p.y=pt.iy; draw(); } return; }
+      if(isPanning){ state.panX+=(mx-lastX); state.panY+=(my-lastY); lastX=mx; lastY=my; draw(); return; }
+    });
+
+    canvas.addEventListener('mouseleave',()=>{ state.hoverId=null; tooltip.style.display='none'; draw(); });
+    window.addEventListener('mouseup',()=>{ if(state.dragging.id){ state.dragging.id=null; } isPanning=false; });
+
+    canvas.addEventListener('mousedown',e=>{
+      const mx=e.offsetX,my=e.offsetY; const id=hitTest(mx,my);
+      if(state.isAdmin&&id){ const p=getPoint(id); const pos=imageToScreen(p.x,p.y); state.dragging.id=id; state.dragging.dx=mx-pos.sx; state.dragging.dy=my-pos.sy; return; }
+      if(state.isAdmin&&state.addMode){
+        const loc=screenToImage(mx,my); const t=state.selectedType; let label='';
+        if(TYPES[t]?.labeled){
+          const def=t==='ep'?'EP':(t==='spill'?'00':''); const v=prompt('Enter label'+(def?' e g '+def+'12':'')); if(v===null) return;
+          label=String(v).trim(); if(t==='ep'&&label&&!/^EP/i.test(label)) label='EP'+label; if(t==='spill'&&!label) label='00';
         }
-        typeSel.value = state.selectedType;
-        typeSel.onchange = () => state.selectedType = typeSel.value;
-        // Zoom/rotate
-        document.getElementById('zoomIn').onclick = () => {
-          state.zoom *= 1.25;
-          draw();
-        };
-        document.getElementById('zoomOut').onclick = () => {
-          state.zoom /= 1.25;
-          draw();
-        };
-        document.getElementById('zoomReset').onclick = () => {
-          resetView();
-          draw();
-        };
-        const rotateDeg = document.getElementById('rotateDeg');
-        rotateDeg.onchange = () => {
-          state.rotDeg = (+rotateDeg.value) || 0;
-          draw();
-        };
-        document.querySelectorAll('[data-rot]').forEach(btn => btn.onclick = () => {
-          rotateDeg.value = btn.getAttribute('data-rot');
-          state.rotDeg = (+rotateDeg.value) || 0;
-          draw();
-        });
-        // Auth (no auto-login)
-        document.getElementById('loginBtn').onclick = () => {
-          if (document.getElementById('pwd').value === ADMIN_PASSWORD) {
-            state.isAdmin = true;
-            document.getElementById('authBox').style.display = 'none';
-            document.getElementById('adminBox').style.display = '';
-            draw();
-          }
-        };
-        document.getElementById('logoutBtn').onclick = () => {
-          state.isAdmin = false;
-          state.addMode = false;
-          document.getElementById('adminBox').style.display = 'none';
-          document.getElementById('authBox').style.display = '';
-          draw();
-        };
-        document.getElementById('addToggleBtn').onclick = () => {
-          state.addMode = !state.addMode;
-          setStatus();
-        };
-        document.getElementById('cancelAddBtn').onclick = () => {
-          state.addMode = false;
-          setStatus();
-        };
-        // Save Layout -> export self-contained HTML
-        document.getElementById('saveLayoutBtn').onclick = saveLayout;
-        // Optional image picker
-        document.getElementById('pickImg').addEventListener('change', (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          const r = new FileReader();
-          r.onload = () => {
-            try {
-              img.src = r.result;
-            } catch {}
-          };
-          r.readAsDataURL(f);
-        });
-      })();
+        addPoint(loc.ix,loc.iy,t,label); draw(); return;
+      }
+      isPanning=true; lastX=mx; lastY=my;
+    });
 
-      function setStatus() {
-        document.getElementById('status').textContent = 'Add: ' + (state.addMode ? ('On (' + TYPES[state.selectedType].name + ')') : 'Off');
-      }
+    canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); if(!state.isAdmin) return; const id=hitTest(e.offsetX,e.offsetY); if(!id) return; if(confirm('Delete pin')) delPoint(id); });
 
-      function warn(msg) {
-        warnBox.textContent = msg || '';
-        warnBox.style.display = msg ? 'block' : 'none';
+    function buildPinModalTypeSelect(){
+      pinTypeSel.innerHTML=''; for(const k of Object.keys(TYPES)){ const o=document.createElement('option'); o.value=k; o.textContent=TYPES[k].name; pinTypeSel.appendChild(o); }
+      const sync=()=>{ const t=pinTypeSel.value; pinLabelWrap.style.display=TYPES[t]?.labeled?'':'none'; pinLabelInput.placeholder=t==='ep'?'EP12':t==='spill'?'00':''; };
+      pinTypeSel.onchange=sync; sync();
+    }
+    function bindPinModal(){
+      const close=()=>{ pinModalOverlay.style.display='none'; state.editingPinId=null; };
+      pinModalCloseBtn.addEventListener('click',close);
+      pinCancelBtn.addEventListener('click',close);
+      pinModalOverlay.addEventListener('click',e=>{ if(e.target===pinModalOverlay) close(); });
+      pinSaveBtn.addEventListener('click',()=>{
+        const type=pinTypeSel.value; const x=Math.max(0,Math.min(state.imgW,+pinX.value||0)); const y=Math.max(0,Math.min(state.imgH,+pinY.value||0)); let label=(pinLabelInput.value||'').trim();
+        if(TYPES[type]?.labeled){ if(type==='ep'&&label&&!/^EP/i.test(label)) label='EP'+label; if(type==='spill'&&!label) label='00'; } else { label=''; }
+        if(state.editingPinId){ const p=getPoint(state.editingPinId); if(!p) return; p.type=type; p.x=x; p.y=y; p.label=label; } else { addPoint(x,y,type,label); }
+        draw(); rebuildPinTable(); state.editingPinId=null; pinModalOverlay.style.display='none';
+      });
+      pinDeleteBtn.addEventListener('click',()=>{ if(!state.editingPinId){ alert('No existing pin selected'); return; } delPoint(state.editingPinId); rebuildPinTable(); state.editingPinId=null; pinModalOverlay.style.display='none'; });
+    }
+    function openPinModal(pin){
+      pinModalOverlay.style.display='flex'; document.getElementById('pinModalTitle').textContent=pin.id?'Edit Pin':'Add Pin';
+      state.editingPinId=pin.id||null; buildPinModalTypeSelect(); pinTypeSel.value=pin.type in TYPES?pin.type:Object.keys(TYPES)[0];
+      pinLabelInput.value=pin.label||''; pinX.value=Math.round(pin.x)||0; pinY.value=Math.round(pin.y)||0; pinDeleteBtn.style.visibility=pin.id?'visible':'hidden'; rebuildPinTable();
+    }
+    function openPinManager(){ openPinModal({id:null,type:state.selectedType in TYPES?state.selectedType:Object.keys(TYPES)[0],x:0,y:0,label:''}); }
+    function rebuildPinTable(){
+      pinTbody.innerHTML=''; for(const p of state.points){
+        const tr=document.createElement('tr');
+        const tdT=document.createElement('td'); tdT.textContent=TYPES[p.type]?.name||p.type; tr.appendChild(tdT);
+        const tdL=document.createElement('td'); tdL.textContent=p.label||''; tr.appendChild(tdL);
+        const tdX=document.createElement('td'); tdX.textContent=Math.round(p.x); tr.appendChild(tdX);
+        const tdY=document.createElement('td'); tdY.textContent=Math.round(p.y); tr.appendChild(tdY);
+        const tdA=document.createElement('td'); tdA.className='right';
+        const btnE=document.createElement('button'); btnE.textContent='Edit'; btnE.onclick=()=>openPinModal({id:p.id,type:p.type,x:p.x,y:p.y,label:p.label||''});
+        const btnD=document.createElement('button'); btnD.textContent='Delete'; btnD.onclick=()=>{ if(confirm('Delete pin')){ delPoint(p.id); rebuildPinTable(); } };
+        tdA.appendChild(btnE); tdA.appendChild(btnD); tr.appendChild(tdA); pinTbody.appendChild(tr);
       }
-      // --- Canvas sizing ---
-      function resize() {
-        canvas.width = wrap.clientWidth;
-        canvas.height = wrap.clientHeight;
-        draw();
-      }
-      window.addEventListener('resize', resize);
-      // --- Embedded / JSON loading ---
-      let hasEmbedded = false;
+    }
 
-      function loadEmbeddedPins() {
-        const el = document.getElementById('initial-pin-data');
-        if (!el) return false;
-        try {
-          const data = JSON.parse(el.textContent.trim() || '[]');
-          if (Array.isArray(data) && data.length) {
-            state.points = data;
-            hasEmbedded = true;
-            return true;
-          }
-        } catch {}
-        return false;
+    function openMarkerManager(){ markerModalOverlay.style.display='flex'; buildTypesTable(); }
+    function bindMarkerModal(){
+      const close=()=>{ markerModalOverlay.style.display='none'; };
+      markerModalCloseBtn.addEventListener('click',close);
+      markerCancelBtn.addEventListener('click',close);
+      markerModalOverlay.addEventListener('click',e=>{ if(e.target===markerModalOverlay) close(); });
+      newTypeHue.addEventListener('input',()=>{ newTypeColor.value=hslToHex(+newTypeHue.value,65,50); });
+      newTypeColor.addEventListener('input',()=>{ const hs=rgbToHslHex(newTypeColor.value); newTypeHue.value=Math.round(hs.h); });
+      addTypeBtn.addEventListener('click',()=>{
+        const key=newTypeKey.value.trim(),name=newTypeName.value.trim(),shape=newTypeShape.value,labeled=newTypeLabeled.checked,color=newTypeColor.value,abbr=newTypeAbbr.value.trim();
+        if(!key||!name){ alert('Key and name required'); return; }
+        if(TYPES[key]){ alert('Key exists'); return; }
+        TYPES[key]={name,color,labeled,shape,...(abbr?{abbr}:{})}; LAYERS[key]=true; buildLegend(); buildTypeSelect(); buildTypesTable(); draw();
+        newTypeKey.value=''; newTypeName.value=''; newTypeShape.value='circle'; newTypeLabeled.checked=false; newTypeHue.value='170'; newTypeColor.value='#00897b'; newTypeAbbr.value='';
+        alert('Type added save layout to persist');
+      });
+    }
+    function buildTypesTable(){
+      typesTbody.innerHTML=''; for(const k of Object.keys(TYPES)){
+        const t=TYPES[k]; const tr=document.createElement('tr');
+        const tdKey=document.createElement('td'); tdKey.textContent=k; tr.appendChild(tdKey);
+        const tdName=document.createElement('td'); const inName=document.createElement('input'); inName.type='text'; inName.value=t.name; inName.style.width='100%';
+        inName.onchange=()=>{ t.name=inName.value; buildLegend(); buildTypeSelect(); buildTypesTable(); draw(); }; tdName.appendChild(inName); tr.appendChild(tdName);
+        const tdShape=document.createElement('td'); const selShape=document.createElement('select'); ['circle','square','triangle','diamond','hex','pill'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; selShape.appendChild(o); });
+        selShape.value=t.shape; selShape.onchange=()=>{ t.shape=selShape.value; buildLegend(); draw(); }; tdShape.appendChild(selShape); tr.appendChild(tdShape);
+        const tdLab=document.createElement('td'); const chkLab=document.createElement('input'); chkLab.type='checkbox'; chkLab.checked=!!t.labeled;
+        chkLab.onchange=()=>{ t.labeled=chkLab.checked; buildLegend(); draw(); }; tdLab.appendChild(chkLab); tr.appendChild(tdLab);
+        const tdColor=document.createElement('td'); const inColor=document.createElement('input'); inColor.type='color'; inColor.value=t.color||'#999999';
+        inColor.oninput=()=>{ t.color=inColor.value; buildLegend(); draw(); }; tdColor.appendChild(inColor); tr.appendChild(tdColor);
+        const tdHue=document.createElement('td'); const inHue=document.createElement('input'); inHue.type='range'; inHue.min='0'; inHue.max='360'; const hs=rgbToHslHex(t.color||'#999999'); inHue.value=Math.round(hs.h);
+        inHue.oninput=()=>{ t.color=hslToHex(+inHue.value,65,50); inColor.value=t.color; buildLegend(); draw(); }; tdHue.appendChild(inHue); tr.appendChild(tdHue);
+        const tdAbbr=document.createElement('td'); const inAbbr=document.createElement('input'); inAbbr.type='text'; inAbbr.value=t.abbr||''; inAbbr.placeholder=autoAbbr(k);
+        inAbbr.onchange=()=>{ const v=inAbbr.value.trim(); if(v) t.abbr=v; else delete t.abbr; buildLegend(); draw(); }; tdAbbr.appendChild(inAbbr); tr.appendChild(tdAbbr);
+        const tdAct=document.createElement('td'); tdAct.className='right'; const delBtn=document.createElement('button'); delBtn.textContent='Remove';
+        delBtn.onclick=()=>{ if(!confirm('Remove type and pins')) return; state.points=state.points.filter(p=>p.type!==k); delete TYPES[k]; delete LAYERS[k]; buildLegend(); buildTypeSelect(); buildTypesTable(); draw(); alert('Type removed save layout to persist'); };
+        tdAct.appendChild(delBtn); tr.appendChild(tdAct); typesTbody.appendChild(tr);
       }
-	  
-      // --- Local storage (autosave for this device) ---
-      function saveLocal() {
-        localStorage.setItem('facilityPins', JSON.stringify({
-          points: state.points
-        }));
-      }
+    }
 
-      function loadLocal() {
-        if (hasEmbedded) return;
-        const s = localStorage.getItem('facilityPins');
-        if (s) {
-          try {
-            const j = JSON.parse(s);
-            if (Array.isArray(j.points)) state.points = j.points;
-          } catch {}
+    async function onImportPins(e){
+      const f=e.target.files&&e.target.files[0]; if(!f) return;
+      try{
+        const text=await f.text(); let imported=[];
+        try{ const j=JSON.parse(text); if(Array.isArray(j)) imported=j; else if(Array.isArray(j.points)) imported=j.points; }
+        catch{
+          const doc=new DOMParser().parseFromString(text,'text/html'); const sc=doc.querySelector('script#initial-pin-data');
+          if(sc){ const raw=(sc.textContent||'').trim(); if(raw){ const j=JSON.parse(raw); if(Array.isArray(j)) imported=j; } }
+          else{ const m=text.match(/"points"\s*:\s*(\[[\s\S]*?\])/); if(m){ const arr=JSON.parse(m[1]); if(Array.isArray(arr)) imported=arr; } }
         }
-      }
-      // --- Image load ---
-      const img = new Image();
-      img.onload = () => {
-        state.img = img;
-        state.imgW = img.naturalWidth;
-        state.imgH = img.naturalHeight;
-        resetView();
-        if (!loadEmbeddedPins()) {
-          loadSavedPoints().then(ok => {
-            if (!ok) loadLocal();
-            draw();
-          });
+        if(!imported.length){ alert('No pins found to import'); return; }
+        const merge=confirm('Ok to merge Cancel to replace');
+        if(merge){
+          const keyOf=p=>p.type+'|'+Math.round(p.x)+'|'+Math.round(p.y)+'|'+(p.label||''); const existing=new Set(state.points.map(keyOf));
+          for(const p of imported){ if(!TYPES[p.type]) continue; if(!existing.has(keyOf(p))){ state.points.push({id:crypto.randomUUID(),type:p.type,x:p.x,y:p.y,label:p.label||''}); } }
         } else {
-          draw();
+          state.points=imported.map(p=>({id:crypto.randomUUID(),type:p.type,x:p.x,y:p.y,label:p.label||''})).filter(p=>!!TYPES[p.type]);
         }
-        warn('');
-      };
-      img.onerror = () => {
-        warn('Map image failed to load. Ensure "facility-map.png" is in the same folder, or use Choose Image…');
-        draw();
-      };
-      img.src = IMAGE_PATH;
+        draw(); alert('Pins imported save layout to persist');
+      }catch(err){ console.error(err); alert('Import failed'); }
+      finally{ e.target.value=''; }
+    }
 
-      function resetView() {
-        const s = Math.min(wrap.clientWidth / state.imgW, wrap.clientHeight / state.imgH);
-        state.zoom = s;
-        state.panX = (wrap.clientWidth - state.imgW * s) / 2;
-        state.panY = (wrap.clientHeight - state.imgH * s) / 2;
-      }
-      // --- Transform helpers ---
-      function deg2rad(d) {
-        return d * Math.PI / 180;
-      }
+    let hasEmbedded=false;
+    function loadEmbeddedPins(){
+      const el=document.getElementById('initial-pin-data'); if(!el) return false;
+      try{ const raw=(el.textContent||'').trim(); const data=raw?JSON.parse(raw):[]; if(Array.isArray(data)){ state.points=data; hasEmbedded=data.length>0; return true; } }catch{}
+      return false;
+    }
+    async function loadSavedPoints(){
+      if(hasEmbedded) return false;
+      try{ const res=await fetch(PINMAP); if(!res.ok) throw new Error('fail'); const data=await res.json(); if(Array.isArray(data)){ state.points=data; draw(); return true; } }
+      catch(e){ console.warn('No saved pins',e); }
+      return false;
+    }
 
-      function imageToScreen(ix, iy) {
-        const cx = state.imgW / 2,
-          cy = state.imgH / 2,
-          a = deg2rad(state.rotDeg);
-        const dx = ix - cx,
-          dy = iy - cy;
-        const rx = dx * Math.cos(a) - dy * Math.sin(a) + cx,
-          ry = dx * Math.sin(a) + dy * Math.cos(a) + cy;
-        return {
-          sx: rx * state.zoom + state.panX,
-          sy: ry * state.zoom + state.panY
-        };
+    function hslToHex(h,s,l){
+      s/=100; l/=100; const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs((h/60)%2-1)); const m=l-c/2; let r=0,g=0,b=0;
+      if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;} else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+      const toHex=v=>{ const n=Math.round((v+m)*255); return n.toString(16).padStart(2,'0'); };
+      return '#'+toHex(r)+toHex(g)+toHex(b);
+    }
+    function rgbToHslHex(hex){
+      const m=hex.replace('#',''); const r=parseInt(m.slice(0,2),16)/255,g=parseInt(m.slice(2,4),16)/255,b=parseInt(m.slice(4,6),16)/255;
+      const max=Math.max(r,g,b),min=Math.min(r,g,b); let h=0,s=0,l=(max+min)/2;
+      if(max!==min){ const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min);
+        switch(max){ case r:h=(g-b)/d+(g<b?6:0);break; case g:h=(b-r)/d+2;break; case b:h=(r-g)/d+4;break; } h*=60;
       }
+      return {h:h,s:s*100,l:l*100};
+    }
 
-      function screenToImage(sx, sy) {
-        const rx = (sx - state.panX) / state.zoom,
-          ry = (sy - state.panY) / state.zoom;
-        const cx = state.imgW / 2,
-          cy = state.imgH / 2,
-          a = -deg2rad(state.rotDeg);
-        const dx = rx - cx,
-          dy = ry - cy;
-        const ix = dx * Math.cos(a) - dy * Math.sin(a) + cx,
-          iy = dx * Math.sin(a) + dy * Math.cos(a) + cy;
-        return {
-          ix,
-          iy
-        };
-      }
-      // --- Data ops ---
-      function addPoint(x, y, type, label) {
-        state.points.push({
-          id: crypto.randomUUID(),
-          type,
-          x,
-          y,
-          label
-        });
-        saveLocal();
-      }
-
-      function getPoint(id) {
-        return state.points.find(p => p.id === id);
-      }
-
-      function delPoint(id) {
-        state.points = state.points.filter(p => p.id !== id);
-        saveLocal();
-        draw();
-      }
-      // --- Drawing ---
-      function clear() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-
-      function draw() {
-        clear();
-        if (!state.img) return;
-        ctx.save();
-        ctx.translate(state.panX, state.panY);
-        ctx.scale(state.zoom, state.zoom);
-        ctx.translate(state.imgW / 2, state.imgH / 2);
-        ctx.rotate(deg2rad(state.rotDeg));
-        ctx.translate(-state.imgW / 2, -state.imgH / 2);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(state.img, 0, 0);
-        ctx.restore();
-        for (const p of state.points) {
-          if (LAYERS[p.type]) drawPoint(p);
-        }
-      }
-
-      function drawPoint(p) {
-        const cfg = TYPES[p.type];
-        const {
-          sx,
-          sy
-        } = imageToScreen(p.x, p.y);
-        const size = 12;
-        ctx.save();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#fff';
-        ctx.fillStyle = cfg.color;
-        if (cfg.shape === 'circle') {
-          circle(sx, sy, size);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cfg.shape === 'square') {
-          rectRound(sx - size, sy - size, size * 2, size * 2, 3);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cfg.shape === 'triangle') {
-          triangle(sx, sy, size);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cfg.shape === 'diamond') {
-          diamond(sx, sy, size);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cfg.shape === 'hex') {
-          hexagon(sx, sy, size);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cfg.shape === 'pill') {
-          let txt = (p.label || '').trim();
-          if (p.type === 'spill') txt = txt || '00';
-		  else if (p.type === 'aed') txt = 'AED';
-          else if (p.type === 'ep') {
-            if (!txt) txt = 'EP';
-            else if (!/^EP/i.test(txt)) txt = 'EP' + txt;
-          } else {
-            txt = txt || 'LBL';
-          }
-          const padX = 8,
-            h = 20;
-          const w = Math.max(28, ctx.measureText(txt).width + padX * 2);
-          pill(sx, sy, w, h);
-          ctx.fillStyle = cfg.color;
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 12px system-ui, Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(txt, sx, sy);
-        }
-        ctx.restore();
-
-        function circle(x, y, r) {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-        }
-
-        function rectRound(x, y, w, h, r) {
-          ctx.beginPath();
-          ctx.moveTo(x + r, y);
-          ctx.arcTo(x + w, y, x + w, y + h, r);
-          ctx.arcTo(x + w, y + h, x, y + h, r);
-          ctx.arcTo(x, y + h, x, y, r);
-          ctx.arcTo(x, y, x + w, y, r);
-        }
-
-        function triangle(x, y, s) {
-          ctx.beginPath();
-          ctx.moveTo(x, y - s);
-          ctx.lineTo(x + s * 0.866, y + s * 0.5);
-          ctx.lineTo(x - s * 0.866, y + s * 0.5);
-          ctx.closePath();
-        }
-
-        function diamond(x, y, s) {
-          ctx.beginPath();
-          ctx.moveTo(x, y - s);
-          ctx.lineTo(x + s, y);
-          ctx.lineTo(x, y + s);
-          ctx.lineTo(x - s, y);
-          ctx.closePath();
-        }
-
-        function hexagon(x, y, s) {
-          ctx.beginPath();
-          for (let i = 0; i < 6; i++) {
-            const a = deg2rad(60 * i - 30);
-            const px = x + s * Math.cos(a),
-              py = y + s * Math.sin(a);
-            i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-          }
-          ctx.closePath();
-        }
-
-        function pill(x, y, w, h) {
-          const r = h / 2;
-          ctx.beginPath();
-          ctx.moveTo(x - w / 2 + r, y - h / 2);
-          ctx.arcTo(x + w / 2, y - h / 2, x + w / 2, y + h / 2, r);
-          ctx.arcTo(x + w / 2, y + h / 2, x - w / 2, y + h / 2, r);
-          ctx.arcTo(x - w / 2, y + h / 2, x - w / 2, y - h / 2, r);
-          ctx.arcTo(x - w / 2, y - h / 2, x + w / 2, y - h / 2, r);
-        }
-      }
-      // --- Hit-testing ---
-      function hitTest(sx, sy) {
-        for (let i = state.points.length - 1; i >= 0; i--) {
-          const p = state.points[i];
-          if (!LAYERS[p.type]) continue;
-          const q = imageToScreen(p.x, p.y);
-          if (Math.hypot(q.sx - sx, q.sy - sy) < 14) return p.id;
-        }
-        return null;
-      }
-      // --- Interaction ---
-      let isPanning = false,
-        lastX = 0,
-        lastY = 0;
-      canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const mx = e.offsetX,
-          my = e.offsetY;
-        const z0 = state.zoom;
-        const dz = Math.pow(1.0015, -e.deltaY);
-        const z1 = Math.max(0.05, Math.min(20, z0 * dz));
-        const {
-          ix,
-          iy
-        } = screenToImage(mx, my);
-        state.zoom = z1;
-        const {
-          sx,
-          sy
-        } = imageToScreen(ix, iy);
-        state.panX += mx - sx;
-        state.panY += my - sy;
-        draw();
-      }, {
-        passive: false
-      });
-      canvas.addEventListener('mousemove', (e) => {
-        const mx = e.offsetX,
-          my = e.offsetY;
-        const id = hitTest(mx, my);
-        state.hoverId = id;
-        if (id) {
-          const p = getPoint(id);
-          const label = (TYPES[p.type].labeled && p.label) ? (p.type === 'ep' && !/^EP/i.test(p.label) ? 'EP' + p.label : p.label) : '';
-          tooltip.textContent = TYPES[p.type].name + (label ? ': ' + label : '');
-          tooltip.style.left = (mx + 12) + 'px';
-          tooltip.style.top = (my + 12) + 'px';
-          tooltip.style.display = 'block';
-        } else {
-          tooltip.style.display = 'none';
-        }
-        if (state.dragging.id) {
-          const {
-            ix,
-            iy
-          } = screenToImage(mx - state.dragging.dx, my - state.dragging.dy);
-          const p = getPoint(state.dragging.id);
-          if (p) {
-            p.x = ix;
-            p.y = iy;
-            draw();
-          }
-          return;
-        }
-        if (isPanning) {
-          state.panX += (mx - lastX);
-          state.panY += (my - lastY);
-          lastX = mx;
-          lastY = my;
-          draw();
-          return;
-        }
-      });
-      canvas.addEventListener('mouseleave', () => {
-        state.hoverId = null;
-        tooltip.style.display = 'none';
-        draw();
-      });
-      window.addEventListener('mouseup', () => {
-        if (state.dragging.id) {
-          state.dragging.id = null;
-          saveLocal();
-        }
-        isPanning = false;
-      });
-      canvas.addEventListener('mousedown', (e) => {
-        const mx = e.offsetX,
-          my = e.offsetY;
-        const id = hitTest(mx, my);
-        if (state.isAdmin && id) {
-          const p = getPoint(id);
-          const {
-            sx,
-            sy
-          } = imageToScreen(p.x, p.y);
-          state.dragging.id = id;
-          state.dragging.dx = mx - sx;
-          state.dragging.dy = my - sy;
-          return;
-        }
-        if (state.isAdmin && state.addMode) {
-          const {
-            ix,
-            iy
-          } = screenToImage(mx, my);
-          const t = state.selectedType;
-          let label = '';
-          if (TYPES[t].labeled) {
-            const defaultLbl = t === 'spill' ? '00' : (t === 'ep' ? 'EP' : '');
-            const v = prompt(`Enter label for ${TYPES[t].name}${defaultLbl?` (e.g., ${defaultLbl}12)`:''}:`);
-            if (v === null) return;
-            label = v.trim();
-            if (t === 'ep' && label && !/^EP/i.test(label)) label = 'EP' + label;
-          }
-          addPoint(ix, iy, t, label);
-          draw();
-          return;
-        }
-        isPanning = true;
-        lastX = mx;
-        lastY = my;
-      });
-      // labeled item click -> edit label; unlabeled -> no popup
-      canvas.addEventListener('click', (e) => {
-        if (!state.isAdmin) return;
-        const id = hitTest(e.offsetX, e.offsetY);
-        if (!id) return;
-        const p = getPoint(id);
-        if (!p) return;
-        if (!TYPES[p.type].labeled) return;
-        const v = prompt(`Edit label for ${TYPES[p.type].name}:`, p.label || '');
-        if (v !== null) {
-          p.label = v.trim();
-          if (p.type === 'ep' && p.label && !/^EP/i.test(p.label)) p.label = 'EP' + p.label;
-          saveLocal();
-          draw();
-        }
-      });
-      // right-click delete
-      canvas.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (!state.isAdmin) return;
-        const id = hitTest(e.offsetX, e.offsetY);
-        if (!id) return;
-        const p = getPoint(id);
-        if (confirm(`Delete ${TYPES[p.type].name}${TYPES[p.type].labeled&&p.label? ' ('+p.label+')':''}?`)) delPoint(id);
-      });
-      // --- Legend icons ---
-      function iconHTML(type) {
-        const c = TYPES[type].color;
-        if (TYPES[type].shape === 'pill') {
-          const text = type === 'spill' ? 'SK' : type === 'aed' ? 'AED' : type === 'ep' ? 'EP' : type === 'safer' ? 'SAFE' : type === 'evac' ? 'EVAC' : 'LBL';
-          return `
-																			<span style="display:inline-block;min-width:28px;padding:2px 6px;border-radius:999px;background:${c};color:#fff;font-weight:700;font-size:12px;text-align:center;">${text}</span>`;
-        }
-        if (TYPES[type].shape === 'circle') return svg(`
-																			<circle cx='9' cy='9' r='7' fill='${c}' stroke='white' stroke-width='2'/>`);
-        if (TYPES[type].shape === 'square') return svg(`
-																			<rect x='3' y='3' width='12' height='12' rx='3' fill='${c}' stroke='white' stroke-width='2'/>`);
-        if (TYPES[type].shape === 'triangle') return svg(`
-																			<polygon points='9,2 16,16 2,16' fill='${c}' stroke='white' stroke-width='2'/>`);
-        if (TYPES[type].shape === 'diamond') return svg(`
-																			<polygon points='9,2 16,9 9,16 2,9' fill='${c}' stroke='white' stroke-width='2'/>`);
-        if (TYPES[type].shape === 'hex') return svg(`
-																			<polygon points='4,5 9,2 14,5 14,13 9,16 4,13' fill='${c}' stroke='white' stroke-width='2'/>`);
-
-        function svg(inner) {
-          return `
-																			<svg width='18' height='18' viewBox='0 0 18 18' aria-hidden='true'>${inner}</svg>`;
-        }
-      }
-      // --- Save Layout -> export self-contained HTML with embedded pins ---
-      function saveLayout() {
-        try {
-          let html = document.documentElement.outerHTML;
-          // 0) Reset typeSel dropdown to a clean placeholder
-          html = html.replace(/ < select id = "typeSel" [\s\ S] * ? < \/select>/i, ' < select id = "typeSel" > < /select>');
-          // 1) Embed current pins
-          const updatedPins = JSON.stringify(state.points, null, 2);
-          html = html.replace(/ < script id = "initial-pin-data" [ ^ > ] * > [\s\ S] * ? < \/script>/i, `
-																					<script id="initial-pin-data" type="application/json">\n${updatedPins}\n<\/script>`);
-          // 2) Force logged-out UI in the exported file
-          html = html.replace(/ < div id = "adminBox" [ ^ > ] * > /i, (m)=>{
-            return /style=/i.test(m) ? m.replace(/style="[^"]*"/i, 'style="display:none;"') : m.replace(/>$/, ' style="display:none;">');
-          });
-        html = html.replace(/ < div id = "authBox" [ ^ > ] * > /i, (m)=>{
-          return /style=/i.test(m) ? m.replace(/style="[^"]*"/i, '') : m;
-        });
-      html = html.replace(/( < input[ ^ > ] * id = "pwd" [ ^ > ] * ? )\ s * value = "[^"] * "/i, '$1');
-      // 3) Download updated HTML
-      const blob = new Blob([html], {
-        type: 'text/html'
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'index.html';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      }
-      catch (err) {
-        console.error(err);
-        alert('Export failed.');
-      }
-      }
-
-      function updateLegendForPrint() {
-        document.querySelectorAll('.legend label').forEach(lbl => {
-          const cb = lbl.querySelector('input[type="checkbox"]');
-          if (cb && !cb.checked) {
-            lbl.classList.add('print-hide');
-          }
-        });
-      }
-
-      function cleanupLegendAfterPrint() {
-        document.querySelectorAll('.legend label.print-hide').forEach(lbl => lbl.classList.remove('print-hide'));
-      }
-      window.addEventListener('beforeprint', updateLegendForPrint);
-      window.addEventListener('afterprint', cleanupLegendAfterPrint);
-      // --- Kickoff ---
-      resize();
-    </script>
-  </body>
+    function initUI(){
+      applyBoot();
+      buildLegend(); buildTypeSelect();
+      bindViewControls(); bindPrintControls(); bindAuthControls(); bindAdminControls(); bindPasswordChange();
+      buildPinModalTypeSelect(); bindPinModal(); bindMarkerModal(); resize();
+    }
+    window.addEventListener('DOMContentLoaded',()=>{ initUI(); if(!state.img){ const i2=new Image(); i2.onload=img.onload; i2.onerror=img.onerror; i2.src=IMAGE_PATH; } });
+  </script>
+</body>
 </html>
